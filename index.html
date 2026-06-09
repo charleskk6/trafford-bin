@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#5b1a72" />
+  <title>Trafford Bin Collections</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>🗑️ Trafford Bin Collections</h1>
+    <p class="sub">Present bins by 6:30am · bring them back in the same day</p>
+  </header>
+
+  <main>
+    <!-- Next collection hero -->
+    <section id="next" class="card next-card" aria-live="polite">
+      <div class="next-loading">Loading…</div>
+    </section>
+
+    <!-- Notifications -->
+    <section class="card notify-card">
+      <div class="notify-row">
+        <div>
+          <h2>Reminders</h2>
+          <p id="notify-status" class="muted">Get a notification the evening before each collection.</p>
+        </div>
+        <button id="notify-btn" class="btn">Enable reminders</button>
+      </div>
+      <div class="notify-controls" id="notify-controls" hidden>
+        <label>
+          Remind me the day before at
+          <input type="time" id="remind-time" value="18:00" />
+        </label>
+        <button id="test-btn" class="btn btn-ghost">Send test</button>
+      </div>
+      <p class="hint">Tip: install this app to your home screen (Share → Add to Home Screen) for the most reliable reminders.</p>
+    </section>
+
+    <!-- Bin legend -->
+    <section class="card">
+      <h2>What goes out</h2>
+      <ul id="legend" class="legend"></ul>
+    </section>
+
+    <!-- Upcoming list -->
+    <section class="card">
+      <div class="card-head">
+        <h2>Upcoming collections</h2>
+        <button id="toggle-all" class="btn btn-ghost btn-sm">Show all</button>
+      </div>
+      <ul id="upcoming" class="collections"></ul>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Green bin collections are suspended 22–28 December.</p>
+    <p>Unofficial app · data from the Trafford Council waste calendar 2025–2026.</p>
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

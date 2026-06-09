@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#5b1a72"/>
+  <g transform="translate(146 120)">
+    <!-- bin body -->
+    <path d="M30 70 L190 70 L176 360 Q174 392 142 392 L78 392 Q46 392 44 360 Z" fill="#ffffff"/>
+    <!-- lid -->
+    <rect x="14" y="44" width="192" height="34" rx="12" fill="#ffffff"/>
+    <!-- handle -->
+    <rect x="82" y="20" width="56" height="28" rx="12" fill="#ffffff"/>
+    <!-- ribs -->
+    <rect x="74" y="110" width="14" height="240" rx="7" fill="#5b1a72"/>
+    <rect x="104" y="110" width="14" height="240" rx="7" fill="#5b1a72"/>
+    <rect x="134" y="110" width="14" height="240" rx="7" fill="#5b1a72"/>
+  </g>
+</svg>
