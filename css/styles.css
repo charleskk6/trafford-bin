@@ -65,19 +65,6 @@ main {
 }
 .bin-chip .e { font-size: 1.1rem; }
 
-/* Notifications */
-.notify-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.notify-row h2 { margin: 0 0 4px; }
-.notify-controls {
-  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
-  display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
-}
-.notify-controls label { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
-.notify-controls input[type="time"] {
-  border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; font-size: 0.9rem;
-}
-.hint { margin: 12px 0 0; font-size: 0.78rem; color: var(--muted); }
-
 .btn {
   background: var(--purple); color: #fff; border: none;
   border-radius: 10px; padding: 10px 16px; font-size: 0.9rem; font-weight: 600;

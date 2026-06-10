@@ -1,5 +1,5 @@
-/* Service worker: offline caching + notification click handling */
-const CACHE = "trafford-bin-v1";
+/* Service worker: offline caching */
+const CACHE = "trafford-bin-v2";
 const ASSETS = [
   "./",
   "index.html",
@@ -28,17 +28,5 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   e.respondWith(
     caches.match(e.request).then((cached) => cached || fetch(e.request))
-  );
-});
-
-self.addEventListener("notificationclick", (e) => {
-  e.notification.close();
-  e.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      for (const c of list) {
-        if ("focus" in c) return c.focus();
-      }
-      if (self.clients.openWindow) return self.clients.openWindow("./");
-    })
   );
 });
