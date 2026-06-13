@@ -27,6 +27,15 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
 .card-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
 .card-head h2 { margin:0; }
 .muted { color:var(--muted); }
+/* Postcode picker */
+.pc-card { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.pc-left { display:flex; align-items:center; gap:10px; }
+.pc-left label { font-weight:600; }
+#postcode { font-size:1rem; font-weight:600; padding:8px 12px; border-radius:10px;
+  border:1px solid var(--border); background:var(--card); color:var(--text); }
+.pc-badge { display:inline-flex; align-items:center; gap:6px; background:var(--purple); color:#fff;
+  font-weight:700; padding:6px 14px; border-radius:999px; font-size:.9rem; letter-spacing:.02em; }
+.pc-badge::before { content:"📍"; }
 .next-card { background:linear-gradient(135deg,#fff,#faf7fc); border:1px solid var(--border); }
 .next-when { font-size:.85rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
 .next-date { font-size:1.5rem; font-weight:700; margin:4px 0 14px; }
@@ -56,6 +65,7 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
 .dot .s { width:10px; height:10px; border-radius:50%; flex:none; }
 .col-rel { flex:none; font-size:.75rem; color:var(--muted); }
 .past { opacity:.4; }
+.empty { color:var(--muted); padding:6px 0; }
 .foot { text-align:center; padding:24px 16px calc(env(safe-area-inset-bottom) + 24px);
   color:var(--muted); font-size:.78rem; }
 .foot p { margin:4px 0; }
@@ -68,10 +78,21 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
 <body>
   <header class="topbar">
     <h1>🗑️ Trafford Bin Collections</h1>
-    <p class="sub">Present bins by 6:30am · bring them back in the same day</p>
+    <p class="sub">Present bins by 6:30am · bring them back within 48 hours</p>
   </header>
 
   <main>
+    <section class="card pc-card">
+      <div class="pc-left">
+        <label for="postcode">Postcode</label>
+        <select id="postcode">
+        <option value="M33 7TJ">M33 7TJ</option>
+        <option value="M33 6UU">M33 6UU</option>
+        </select>
+      </div>
+      <span class="pc-badge" id="pc-badge">M33 7TJ</span>
+    </section>
+
     <section id="next" class="card next-card" aria-live="polite">
       <div>Loading…</div>
     </section>
@@ -102,39 +123,65 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
 
   <script>(function () {
   var BIN = {"grey": {"name": "Grey bin", "desc": "General / non-recyclable waste", "color": "#6B7280", "emoji": "🗑️"}, "black": {"name": "Black bin", "desc": "Mixed recycling — plastics, glass, cans", "color": "#1F2937", "emoji": "♻️"}, "blue": {"name": "Blue bin", "desc": "Paper & cardboard", "color": "#2563EB", "emoji": "📦"}, "green": {"name": "Green bin / caddy", "desc": "Food & garden waste (weekly)", "color": "#16A34A", "emoji": "🌿"}};
-  var COLLECTIONS = [{"date": "2025-11-05", "bins": ["grey", "green"]}, {"date": "2025-11-12", "bins": ["black", "green"]}, {"date": "2025-11-19", "bins": ["grey", "green"]}, {"date": "2025-11-26", "bins": ["blue", "green"]}, {"date": "2025-12-03", "bins": ["grey", "green"]}, {"date": "2025-12-10", "bins": ["black", "green"]}, {"date": "2025-12-17", "bins": ["grey", "green"]}, {"date": "2025-12-24", "bins": ["blue"]}, {"date": "2025-12-31", "bins": ["grey", "green"]}, {"date": "2026-01-07", "bins": ["black", "green"]}, {"date": "2026-01-14", "bins": ["grey", "green"]}, {"date": "2026-01-21", "bins": ["blue", "green"]}, {"date": "2026-01-28", "bins": ["grey", "green"]}, {"date": "2026-02-04", "bins": ["black", "green"]}, {"date": "2026-02-11", "bins": ["grey", "green"]}, {"date": "2026-02-18", "bins": ["blue", "green"]}, {"date": "2026-02-25", "bins": ["grey", "green"]}, {"date": "2026-03-04", "bins": ["black", "green"]}, {"date": "2026-03-11", "bins": ["grey", "green"]}, {"date": "2026-03-18", "bins": ["blue", "green"]}, {"date": "2026-03-25", "bins": ["grey", "green"]}, {"date": "2026-04-01", "bins": ["black", "green"]}, {"date": "2026-04-08", "bins": ["grey", "green"]}, {"date": "2026-04-15", "bins": ["blue", "green"]}, {"date": "2026-04-22", "bins": ["grey", "green"]}, {"date": "2026-04-29", "bins": ["black", "green"]}, {"date": "2026-05-06", "bins": ["grey", "green"]}, {"date": "2026-05-13", "bins": ["blue", "green"]}, {"date": "2026-05-20", "bins": ["grey", "green"]}, {"date": "2026-05-27", "bins": ["black", "green"]}, {"date": "2026-06-03", "bins": ["grey", "green"]}, {"date": "2026-06-10", "bins": ["blue", "green"]}, {"date": "2026-06-17", "bins": ["grey", "green"]}, {"date": "2026-06-24", "bins": ["black", "green"]}, {"date": "2026-07-01", "bins": ["grey", "green"]}, {"date": "2026-07-08", "bins": ["blue", "green"]}, {"date": "2026-07-15", "bins": ["grey", "green"]}, {"date": "2026-07-22", "bins": ["black", "green"]}, {"date": "2026-07-29", "bins": ["grey", "green"]}, {"date": "2026-08-05", "bins": ["blue", "green"]}, {"date": "2026-08-12", "bins": ["grey", "green"]}, {"date": "2026-08-19", "bins": ["black", "green"]}, {"date": "2026-08-26", "bins": ["grey", "green"]}, {"date": "2026-09-02", "bins": ["blue", "green"]}, {"date": "2026-09-09", "bins": ["grey", "green"]}, {"date": "2026-09-16", "bins": ["black", "green"]}, {"date": "2026-09-23", "bins": ["grey", "green"]}, {"date": "2026-09-30", "bins": ["blue", "green"]}, {"date": "2026-10-07", "bins": ["grey", "green"]}, {"date": "2026-10-14", "bins": ["black", "green"]}, {"date": "2026-10-21", "bins": ["grey", "green"]}, {"date": "2026-10-28", "bins": ["blue", "green"]}, {"date": "2026-11-04", "bins": ["grey", "green"]}, {"date": "2026-11-11", "bins": ["black", "green"]}, {"date": "2026-11-18", "bins": ["grey", "green"]}, {"date": "2026-11-25", "bins": ["blue", "green"]}];
+  var DATA = {"M33 7TJ": [{"date": "2025-11-05", "bins": ["grey", "green"]}, {"date": "2025-11-12", "bins": ["black", "green"]}, {"date": "2025-11-19", "bins": ["grey", "green"]}, {"date": "2025-11-26", "bins": ["blue", "green"]}, {"date": "2025-12-03", "bins": ["grey", "green"]}, {"date": "2025-12-10", "bins": ["black", "green"]}, {"date": "2025-12-17", "bins": ["grey", "green"]}, {"date": "2025-12-24", "bins": ["blue"]}, {"date": "2025-12-31", "bins": ["grey", "green"]}, {"date": "2026-01-07", "bins": ["black", "green"]}, {"date": "2026-01-14", "bins": ["grey", "green"]}, {"date": "2026-01-21", "bins": ["blue", "green"]}, {"date": "2026-01-28", "bins": ["grey", "green"]}, {"date": "2026-02-04", "bins": ["black", "green"]}, {"date": "2026-02-11", "bins": ["grey", "green"]}, {"date": "2026-02-18", "bins": ["blue", "green"]}, {"date": "2026-02-25", "bins": ["grey", "green"]}, {"date": "2026-03-04", "bins": ["black", "green"]}, {"date": "2026-03-11", "bins": ["grey", "green"]}, {"date": "2026-03-18", "bins": ["blue", "green"]}, {"date": "2026-03-25", "bins": ["grey", "green"]}, {"date": "2026-04-01", "bins": ["black", "green"]}, {"date": "2026-04-08", "bins": ["grey", "green"]}, {"date": "2026-04-15", "bins": ["blue", "green"]}, {"date": "2026-04-22", "bins": ["grey", "green"]}, {"date": "2026-04-29", "bins": ["black", "green"]}, {"date": "2026-05-06", "bins": ["grey", "green"]}, {"date": "2026-05-13", "bins": ["blue", "green"]}, {"date": "2026-05-20", "bins": ["grey", "green"]}, {"date": "2026-05-27", "bins": ["black", "green"]}, {"date": "2026-06-03", "bins": ["grey", "green"]}, {"date": "2026-06-10", "bins": ["blue", "green"]}, {"date": "2026-06-17", "bins": ["grey", "green"]}, {"date": "2026-06-24", "bins": ["black", "green"]}, {"date": "2026-07-01", "bins": ["grey", "green"]}, {"date": "2026-07-08", "bins": ["blue", "green"]}, {"date": "2026-07-15", "bins": ["grey", "green"]}, {"date": "2026-07-22", "bins": ["black", "green"]}, {"date": "2026-07-29", "bins": ["grey", "green"]}, {"date": "2026-08-05", "bins": ["blue", "green"]}, {"date": "2026-08-12", "bins": ["grey", "green"]}, {"date": "2026-08-19", "bins": ["black", "green"]}, {"date": "2026-08-26", "bins": ["grey", "green"]}, {"date": "2026-09-02", "bins": ["blue", "green"]}, {"date": "2026-09-09", "bins": ["grey", "green"]}, {"date": "2026-09-16", "bins": ["black", "green"]}, {"date": "2026-09-23", "bins": ["grey", "green"]}, {"date": "2026-09-30", "bins": ["blue", "green"]}, {"date": "2026-10-07", "bins": ["grey", "green"]}, {"date": "2026-10-14", "bins": ["black", "green"]}, {"date": "2026-10-21", "bins": ["grey", "green"]}, {"date": "2026-10-28", "bins": ["blue", "green"]}, {"date": "2026-11-04", "bins": ["grey", "green"]}, {"date": "2026-11-11", "bins": ["black", "green"]}, {"date": "2026-11-18", "bins": ["grey", "green"]}, {"date": "2026-11-25", "bins": ["blue", "green"]}], "M33 6UU": [{"date": "2025-11-05", "bins": ["grey", "green"]}, {"date": "2025-11-12", "bins": ["black", "green"]}, {"date": "2025-11-19", "bins": ["grey", "green"]}, {"date": "2025-11-26", "bins": ["blue", "green"]}, {"date": "2025-12-03", "bins": ["grey", "green"]}, {"date": "2025-12-10", "bins": ["black", "green"]}, {"date": "2025-12-17", "bins": ["grey", "green"]}, {"date": "2025-12-24", "bins": ["blue"]}, {"date": "2025-12-31", "bins": ["grey", "green"]}, {"date": "2026-01-07", "bins": ["black", "green"]}, {"date": "2026-01-14", "bins": ["grey", "green"]}, {"date": "2026-01-21", "bins": ["blue", "green"]}, {"date": "2026-01-28", "bins": ["grey", "green"]}, {"date": "2026-02-04", "bins": ["black", "green"]}, {"date": "2026-02-11", "bins": ["grey", "green"]}, {"date": "2026-02-18", "bins": ["blue", "green"]}, {"date": "2026-02-25", "bins": ["grey", "green"]}, {"date": "2026-03-04", "bins": ["black", "green"]}, {"date": "2026-03-11", "bins": ["grey", "green"]}, {"date": "2026-03-18", "bins": ["blue", "green"]}, {"date": "2026-03-25", "bins": ["grey", "green"]}, {"date": "2026-04-01", "bins": ["black", "green"]}, {"date": "2026-04-08", "bins": ["grey", "green"]}, {"date": "2026-04-15", "bins": ["blue", "green"]}, {"date": "2026-04-22", "bins": ["grey", "green"]}, {"date": "2026-04-29", "bins": ["black", "green"]}, {"date": "2026-05-06", "bins": ["grey", "green"]}, {"date": "2026-05-13", "bins": ["blue", "green"]}, {"date": "2026-05-20", "bins": ["grey", "green"]}, {"date": "2026-05-27", "bins": ["black", "green"]}, {"date": "2026-06-03", "bins": ["grey", "green"]}, {"date": "2026-06-10", "bins": ["blue", "green"]}, {"date": "2026-06-17", "bins": ["grey", "green"]}, {"date": "2026-06-24", "bins": ["black", "green"]}, {"date": "2026-07-01", "bins": ["grey", "green"]}, {"date": "2026-07-08", "bins": ["blue", "green"]}, {"date": "2026-07-15", "bins": ["grey", "green"]}, {"date": "2026-07-22", "bins": ["black", "green"]}, {"date": "2026-07-29", "bins": ["grey", "green"]}, {"date": "2026-08-05", "bins": ["blue", "green"]}, {"date": "2026-08-12", "bins": ["grey", "green"]}, {"date": "2026-08-19", "bins": ["black", "green"]}, {"date": "2026-08-26", "bins": ["grey", "green"]}, {"date": "2026-09-02", "bins": ["blue", "green"]}, {"date": "2026-09-09", "bins": ["grey", "green"]}, {"date": "2026-09-16", "bins": ["black", "green"]}, {"date": "2026-09-23", "bins": ["grey", "green"]}, {"date": "2026-09-30", "bins": ["blue", "green"]}, {"date": "2026-10-07", "bins": ["grey", "green"]}, {"date": "2026-10-14", "bins": ["black", "green"]}, {"date": "2026-10-21", "bins": ["grey", "green"]}, {"date": "2026-10-28", "bins": ["blue", "green"]}, {"date": "2026-11-04", "bins": ["grey", "green"]}, {"date": "2026-11-11", "bins": ["black", "green"]}, {"date": "2026-11-18", "bins": ["grey", "green"]}, {"date": "2026-11-25", "bins": ["blue", "green"]}]};                 // postcode -> [{date, bins}]
+  var DEFAULT_PC = "M33 7TJ";
+  var STORE = "trafford-postcode";
+
   function parseISO(s){var p=s.split("-");return new Date(+p[0],+p[1]-1,+p[2]);}
   function todayISO(){return new Date().toISOString().slice(0,10);}
   function fmtFull(s){return parseISO(s).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});}
   function daysUntil(s){return Math.round((parseISO(s)-parseISO(todayISO()))/86400000);}
   function rel(n){if(n===0)return"Today";if(n===1)return"Tomorrow";if(n<0)return(-n)+"d ago";
     if(n<7)return"In "+n+" days";if(n<14)return"Next week";return"In "+Math.round(n/7)+" weeks";}
-  function upcoming(){var t=todayISO();return COLLECTIONS.filter(function(c){return c.date>=t;});}
   function chips(bins){return bins.map(function(k){var b=BIN[k];
     return '<span class="bin-chip" style="background:'+b.color+'"><span class="e">'+b.emoji+'</span>'+b.name+'</span>';}).join("");}
   function dots(bins){return bins.map(function(k){var b=BIN[k];
     return '<span class="dot"><span class="s" style="background:'+b.color+'"></span>'+b.name+'</span>';}).join("");}
+
+  function loadPC(){var s=localStorage.getItem(STORE);return (s && DATA[s])?s:DEFAULT_PC;}
+  function savePC(pc){try{localStorage.setItem(STORE,pc);}catch(e){}}
+
+  var current = loadPC();
+  var showAll = false;
+
+  function list(){return DATA[current]||[];}
+  function upcoming(){var t=todayISO();return list().filter(function(c){return c.date>=t;});}
+
   function renderNext(){
-    var el=document.getElementById("next"),c=upcoming()[0];
-    if(!c){el.innerHTML='<div>No upcoming collections in the calendar.</div>';return;}
+    var el=document.getElementById("next");
+    if(!list().length){el.innerHTML='<div class="empty">No schedule added yet for <strong>'+current+'</strong>.</div>';return;}
+    var c=upcoming()[0];
+    if(!c){el.innerHTML='<div class="empty">No upcoming collections in the calendar for '+current+'.</div>';return;}
     var n=daysUntil(c.date);
-    el.innerHTML='<div class="next-when">Next collection · '+rel(n)+'</div>'+
+    el.innerHTML='<div class="next-when">Next collection · '+current+' · '+rel(n)+'</div>'+
       '<div class="next-date">'+fmtFull(c.date)+'</div><div class="next-bins">'+chips(c.bins)+'</div>';
   }
-  var showAll=false;
+
   function renderUpcoming(){
-    var t=todayISO(),items=showAll?COLLECTIONS:upcoming().slice(0,8);
-    document.getElementById("upcoming").innerHTML=items.map(function(c){
+    var el=document.getElementById("upcoming");
+    if(!list().length){el.innerHTML='<li class="empty">Nothing to show yet for '+current+'.</li>';return;}
+    var t=todayISO(),items=showAll?list():upcoming().slice(0,8);
+    el.innerHTML=items.map(function(c){
       var d=parseISO(c.date),past=c.date<t,n=daysUntil(c.date);
       return '<li class="'+(past?"past":"")+'"><div class="col-date"><div class="d">'+d.getDate()+
         '</div><div class="m">'+d.toLocaleDateString("en-GB",{month:"short"})+'</div></div>'+
         '<div class="col-bins">'+dots(c.bins)+'</div><div class="col-rel">'+(past?"":rel(n))+'</div></li>';
     }).join("");
   }
+
+  function refresh(){
+    document.getElementById("pc-badge").textContent=current;
+    renderNext();renderUpcoming();
+  }
+
+  var sel=document.getElementById("postcode");
+  sel.value=current;
+  sel.addEventListener("change",function(){current=sel.value;savePC(current);refresh();});
   document.getElementById("toggle-all").addEventListener("click",function(e){
     showAll=!showAll;e.target.textContent=showAll?"Show less":"Show all";renderUpcoming();});
-  renderNext();renderUpcoming();
-  document.addEventListener("visibilitychange",function(){if(!document.hidden){renderNext();renderUpcoming();}});
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)refresh();});
+
+  refresh();
 })();</script>
 </body>
 </html>

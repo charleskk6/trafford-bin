@@ -5,9 +5,12 @@ calendar (Nov 2025 – Nov 2026) — which bins to put out, and when.
 
 ## Features
 
+- 📍 **Postcode picker** (M33 7TJ, M33 6UU) — your choice is remembered in the browser and the active postcode is highlighted
 - 📅 **Next collection** banner + full upcoming list
 - ♻️ **Bin legend** decoded from the council calendar
 - 📲 **Installable** to your phone's home screen and works **offline** (service worker)
+
+> Add another postcode by pasting its dates into `PRIMARY_SCHEDULES` in `generate.py`.
 
 ## The bins
 

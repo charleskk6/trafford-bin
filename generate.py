@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """Generate a self-contained index.html for the Trafford bin collection calendar.
 
-This script is the single source of truth: it holds the calendar data and emits
-a static, self-contained index.html (inline CSS, data embedded as JSON, plus a
-tiny inline script that highlights the next collection and computes relative
-dates against the viewer's "today").
+This script is the single source of truth: it holds the calendar data for each
+supported postcode and emits a static, self-contained index.html (inline CSS,
+data embedded as JSON, plus a small inline script that lets you pick a postcode,
+remembers the choice, highlights the active one, and shows the next collection).
 
 Usage:
     python3 generate.py        # writes ./index.html
 """
 
 import json
-from datetime import date
 from pathlib import Path
 
 # --- Bin definitions --------------------------------------------------------
@@ -27,8 +26,16 @@ BIN_TYPES = {
     "green": {"name": "Green bin / caddy", "desc": "Food & garden waste (weekly)",   "color": "#16A34A", "emoji": "🌿"},
 }
 
-# Primary (rotating) bin per collection date, transcribed from the calendar.
-PRIMARY_SCHEDULE = [
+# --- Schedules per postcode -------------------------------------------------
+# Each entry: postcode -> list of (ISO date, primary rotating bin).
+# The Green bin/caddy is added automatically on every collection day (weekly),
+# except during the festive suspension (see green_suspended()).
+#
+# To add a postcode, paste its (date, bin) rows below.
+
+# Transcribed from the Trafford 2025/26 calendar. The calendars supplied for
+# M33 7TJ and M33 6UU are identical, so both postcodes share this schedule.
+_M33_2025_26 = [
     ("2025-11-05", "grey"),  ("2025-11-12", "black"), ("2025-11-19", "grey"), ("2025-11-26", "blue"),
     ("2025-12-03", "grey"),  ("2025-12-10", "black"), ("2025-12-17", "grey"), ("2025-12-24", "blue"), ("2025-12-31", "grey"),
     ("2026-01-07", "black"), ("2026-01-14", "grey"),  ("2026-01-21", "blue"), ("2026-01-28", "grey"),
@@ -44,20 +51,32 @@ PRIMARY_SCHEDULE = [
     ("2026-11-04", "grey"),  ("2026-11-11", "black"), ("2026-11-18", "grey"), ("2026-11-25", "blue"),
 ]
 
+PRIMARY_SCHEDULES = {
+    "M33 7TJ": _M33_2025_26,
+    "M33 6UU": _M33_2025_26,
+}
+
+DEFAULT_POSTCODE = "M33 7TJ"
+
 
 def green_suspended(iso: str) -> bool:
     """Green collections are suspended 22–28 December (festive period)."""
     return "2025-12-22" <= iso <= "2025-12-28"
 
 
-def build_collections():
+def build_collections(primary_schedule):
     out = []
-    for iso, primary in PRIMARY_SCHEDULE:
+    for iso, primary in primary_schedule:
         bins = [primary]
         if not green_suspended(iso):
             bins.append("green")
         out.append({"date": iso, "bins": bins})
     return out
+
+
+def build_all():
+    """postcode -> list of {date, bins}."""
+    return {pc: build_collections(rows) for pc, rows in PRIMARY_SCHEDULES.items()}
 
 
 # --- HTML rendering ---------------------------------------------------------
@@ -79,6 +98,15 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
 .card-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
 .card-head h2 { margin:0; }
 .muted { color:var(--muted); }
+/* Postcode picker */
+.pc-card { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.pc-left { display:flex; align-items:center; gap:10px; }
+.pc-left label { font-weight:600; }
+#postcode { font-size:1rem; font-weight:600; padding:8px 12px; border-radius:10px;
+  border:1px solid var(--border); background:var(--card); color:var(--text); }
+.pc-badge { display:inline-flex; align-items:center; gap:6px; background:var(--purple); color:#fff;
+  font-weight:700; padding:6px 14px; border-radius:999px; font-size:.9rem; letter-spacing:.02em; }
+.pc-badge::before { content:"📍"; }
 .next-card { background:linear-gradient(135deg,#fff,#faf7fc); border:1px solid var(--border); }
 .next-when { font-size:.85rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
 .next-date { font-size:1.5rem; font-weight:700; margin:4px 0 14px; }
@@ -108,6 +136,7 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
 .dot .s { width:10px; height:10px; border-radius:50%; flex:none; }
 .col-rel { flex:none; font-size:.75rem; color:var(--muted); }
 .past { opacity:.4; }
+.empty { color:var(--muted); padding:6px 0; }
 .foot { text-align:center; padding:24px 16px calc(env(safe-area-inset-bottom) + 24px);
   color:var(--muted); font-size:.78rem; }
 .foot p { margin:4px 0; }
@@ -132,54 +161,87 @@ def render_legend() -> str:
     return "\n".join(rows)
 
 
-# Inline script: renders the date-dependent "next" hero and upcoming list from
+def render_options() -> str:
+    return "\n".join(
+        f'        <option value="{pc}">{pc}</option>' for pc in PRIMARY_SCHEDULES
+    )
+
+
+# Inline script: postcode selection (remembered in localStorage), active-postcode
+# highlight, and the date-dependent "next" hero + upcoming list, rendered from
 # embedded JSON so the page stays accurate against the viewer's current date.
 SCRIPT = r"""
 (function () {
   var BIN = __BIN_TYPES__;
-  var COLLECTIONS = __COLLECTIONS__;
+  var DATA = __DATA__;                 // postcode -> [{date, bins}]
+  var DEFAULT_PC = __DEFAULT__;
+  var STORE = "trafford-postcode";
+
   function parseISO(s){var p=s.split("-");return new Date(+p[0],+p[1]-1,+p[2]);}
   function todayISO(){return new Date().toISOString().slice(0,10);}
   function fmtFull(s){return parseISO(s).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});}
   function daysUntil(s){return Math.round((parseISO(s)-parseISO(todayISO()))/86400000);}
   function rel(n){if(n===0)return"Today";if(n===1)return"Tomorrow";if(n<0)return(-n)+"d ago";
     if(n<7)return"In "+n+" days";if(n<14)return"Next week";return"In "+Math.round(n/7)+" weeks";}
-  function upcoming(){var t=todayISO();return COLLECTIONS.filter(function(c){return c.date>=t;});}
   function chips(bins){return bins.map(function(k){var b=BIN[k];
     return '<span class="bin-chip" style="background:'+b.color+'"><span class="e">'+b.emoji+'</span>'+b.name+'</span>';}).join("");}
   function dots(bins){return bins.map(function(k){var b=BIN[k];
     return '<span class="dot"><span class="s" style="background:'+b.color+'"></span>'+b.name+'</span>';}).join("");}
+
+  function loadPC(){var s=localStorage.getItem(STORE);return (s && DATA[s])?s:DEFAULT_PC;}
+  function savePC(pc){try{localStorage.setItem(STORE,pc);}catch(e){}}
+
+  var current = loadPC();
+  var showAll = false;
+
+  function list(){return DATA[current]||[];}
+  function upcoming(){var t=todayISO();return list().filter(function(c){return c.date>=t;});}
+
   function renderNext(){
-    var el=document.getElementById("next"),c=upcoming()[0];
-    if(!c){el.innerHTML='<div>No upcoming collections in the calendar.</div>';return;}
+    var el=document.getElementById("next");
+    if(!list().length){el.innerHTML='<div class="empty">No schedule added yet for <strong>'+current+'</strong>.</div>';return;}
+    var c=upcoming()[0];
+    if(!c){el.innerHTML='<div class="empty">No upcoming collections in the calendar for '+current+'.</div>';return;}
     var n=daysUntil(c.date);
-    el.innerHTML='<div class="next-when">Next collection · '+rel(n)+'</div>'+
+    el.innerHTML='<div class="next-when">Next collection · '+current+' · '+rel(n)+'</div>'+
       '<div class="next-date">'+fmtFull(c.date)+'</div><div class="next-bins">'+chips(c.bins)+'</div>';
   }
-  var showAll=false;
+
   function renderUpcoming(){
-    var t=todayISO(),items=showAll?COLLECTIONS:upcoming().slice(0,8);
-    document.getElementById("upcoming").innerHTML=items.map(function(c){
+    var el=document.getElementById("upcoming");
+    if(!list().length){el.innerHTML='<li class="empty">Nothing to show yet for '+current+'.</li>';return;}
+    var t=todayISO(),items=showAll?list():upcoming().slice(0,8);
+    el.innerHTML=items.map(function(c){
       var d=parseISO(c.date),past=c.date<t,n=daysUntil(c.date);
       return '<li class="'+(past?"past":"")+'"><div class="col-date"><div class="d">'+d.getDate()+
         '</div><div class="m">'+d.toLocaleDateString("en-GB",{month:"short"})+'</div></div>'+
         '<div class="col-bins">'+dots(c.bins)+'</div><div class="col-rel">'+(past?"":rel(n))+'</div></li>';
     }).join("");
   }
+
+  function refresh(){
+    document.getElementById("pc-badge").textContent=current;
+    renderNext();renderUpcoming();
+  }
+
+  var sel=document.getElementById("postcode");
+  sel.value=current;
+  sel.addEventListener("change",function(){current=sel.value;savePC(current);refresh();});
   document.getElementById("toggle-all").addEventListener("click",function(e){
     showAll=!showAll;e.target.textContent=showAll?"Show less":"Show all";renderUpcoming();});
-  renderNext();renderUpcoming();
-  document.addEventListener("visibilitychange",function(){if(!document.hidden){renderNext();renderUpcoming();}});
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)refresh();});
+
+  refresh();
 })();
 """.strip()
 
 
 def render_html() -> str:
-    collections = build_collections()
     script = (
         SCRIPT
         .replace("__BIN_TYPES__", json.dumps(BIN_TYPES, ensure_ascii=False))
-        .replace("__COLLECTIONS__", json.dumps(collections, ensure_ascii=False))
+        .replace("__DATA__", json.dumps(build_all(), ensure_ascii=False))
+        .replace("__DEFAULT__", json.dumps(DEFAULT_POSTCODE, ensure_ascii=False))
     )
     return f"""<!DOCTYPE html>
 <html lang="en-GB">
@@ -198,10 +260,20 @@ def render_html() -> str:
 <body>
   <header class="topbar">
     <h1>🗑️ Trafford Bin Collections</h1>
-    <p class="sub">Present bins by 6:30am · bring them back in the same day</p>
+    <p class="sub">Present bins by 6:30am · bring them back within 48 hours</p>
   </header>
 
   <main>
+    <section class="card pc-card">
+      <div class="pc-left">
+        <label for="postcode">Postcode</label>
+        <select id="postcode">
+{render_options()}
+        </select>
+      </div>
+      <span class="pc-badge" id="pc-badge">{DEFAULT_POSTCODE}</span>
+    </section>
+
     <section id="next" class="card next-card" aria-live="polite">
       <div>Loading…</div>
     </section>
@@ -236,7 +308,8 @@ def render_html() -> str:
 def main() -> None:
     out = Path(__file__).resolve().parent / "index.html"
     out.write_text(render_html(), encoding="utf-8")
-    print(f"Wrote {out} ({len(build_collections())} collections)")
+    counts = ", ".join(f"{pc}: {len(rows)}" for pc, rows in PRIMARY_SCHEDULES.items())
+    print(f"Wrote {out} ({counts})")
 
 
 if __name__ == "__main__":
