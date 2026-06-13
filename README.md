@@ -7,10 +7,29 @@ calendar (Nov 2025 – Nov 2026) — which bins to put out, and when.
 
 - 📍 **Postcode picker** (M33 7TJ, M33 6UU) — your choice is remembered in the browser and the active postcode is highlighted
 - 📅 **Next collection** banner + full upcoming list
+- 🗓️ **Sync to Google Calendar** — adds the selected postcode's upcoming collections as all-day events (with a reminder the evening before), and **skips any date already present** so re-syncing never duplicates
 - ♻️ **Bin legend** decoded from the council calendar
 - 📲 **Installable** to your phone's home screen and works **offline** (service worker)
 
 > Add another postcode by pasting its dates into `PRIMARY_SCHEDULES` in `generate.py`.
+
+## Google Calendar sync
+
+This runs entirely in the browser (no backend), so it needs your own Google
+OAuth **Web** client ID:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/) create/select a
+   project and **enable the Google Calendar API**.
+2. Under **APIs & Services → Credentials**, create an **OAuth client ID** of
+   type *Web application*.
+3. Add your site's URL (e.g. your GitHub Pages URL, or `http://localhost:8000`)
+   to **Authorised JavaScript origins**.
+4. Open the app, tap **Client ID**, paste the
+   `…apps.googleusercontent.com` value, **Save**, then **Sync to Google
+   Calendar**. (You can also bake it in via `GOOGLE_CLIENT_ID` in `generate.py`.)
+
+Events are tagged with a private marker (`postcode|date`); on each sync the app
+lists existing tagged events and only inserts the missing dates.
 
 ## The bins
 
