@@ -66,6 +66,15 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
 .col-rel { flex:none; font-size:.75rem; color:var(--muted); }
 .past { opacity:.4; }
 .empty { color:var(--muted); padding:6px 0; }
+.gcal-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+.gcal-status { margin:0; }
+#gcal-config { margin-top:14px; padding-top:14px; border-top:1px solid var(--border);
+  display:flex; flex-direction:column; gap:8px; }
+#gcal-config label { font-size:.85rem; font-weight:600; display:flex; flex-direction:column; gap:6px; }
+#gcal-config input { padding:9px 10px; border:1px solid var(--border); border-radius:8px;
+  font-size:.9rem; width:100%; background:var(--card); color:var(--text); }
+.hint { font-size:.78rem; color:var(--muted); margin:2px 0 0; }
+.hint a { color:var(--purple); }
 .foot { text-align:center; padding:24px 16px calc(env(safe-area-inset-bottom) + 24px);
   color:var(--muted); font-size:.78rem; }
 .foot p { margin:4px 0; }
@@ -113,6 +122,25 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
         <button id="toggle-all" class="btn btn-ghost btn-sm">Show all</button>
       </div>
       <ul id="upcoming" class="collections"></ul>
+    </section>
+
+    <section class="card gcal-card">
+      <h2>Google Calendar</h2>
+      <p class="gcal-status muted" id="gcal-status">Add this postcode's upcoming collections to your Google Calendar. Dates already in your calendar are skipped — re-syncing never creates duplicates.</p>
+      <div class="gcal-actions">
+        <button id="gcal-sync" class="btn">Sync to Google Calendar</button>
+        <button id="gcal-config-btn" class="btn btn-ghost btn-sm">Client ID</button>
+      </div>
+      <div id="gcal-config" hidden>
+        <label for="gcal-client-id">Google OAuth Client ID
+          <input id="gcal-client-id" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="1234567890-abc123.apps.googleusercontent.com" />
+        </label>
+        <div class="gcal-actions" style="margin-top:0">
+          <button id="gcal-save" class="btn btn-sm">Save</button>
+        </div>
+        <p class="hint">Create a <strong>Web application</strong> OAuth client in Google Cloud Console, enable the Google Calendar API, and add this site's URL to the client's Authorized JavaScript origins. Stored only in your browser.</p>
+      </div>
     </section>
   </main>
 
@@ -180,6 +208,118 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
   document.getElementById("toggle-all").addEventListener("click",function(e){
     showAll=!showAll;e.target.textContent=showAll?"Show less":"Show all";renderUpcoming();});
   document.addEventListener("visibilitychange",function(){if(!document.hidden)refresh();});
+
+  // ---- Google Calendar sync ------------------------------------------------
+  var GCAL_CLIENT_ID_DEFAULT = "";
+  var GCAL_STORE = "trafford-gcal-client-id";
+  var GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+  var GIS_SRC = "https://accounts.google.com/gsi/client";
+  var gisLoaded = false, accessToken = null;
+
+  function gcalStatus(msg){document.getElementById("gcal-status").textContent=msg;}
+  function gcalClientId(){return ((localStorage.getItem(GCAL_STORE)||GCAL_CLIENT_ID_DEFAULT)||"").trim();}
+
+  function pad(n){return (n<10?"0":"")+n;}
+  function addDays(iso,n){var d=parseISO(iso);d.setDate(d.getDate()+n);
+    return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());}
+
+  function loadGIS(){return new Promise(function(res,rej){
+    if(gisLoaded && window.google && google.accounts){return res();}
+    var s=document.createElement("script");s.src=GIS_SRC;s.async=true;s.defer=true;
+    s.onload=function(){gisLoaded=true;res();};
+    s.onerror=function(){rej(new Error("Could not load Google sign-in (offline?)."));};
+    document.head.appendChild(s);
+  });}
+
+  function getToken(){return new Promise(function(res,rej){
+    var cid=gcalClientId();
+    if(!cid){rej(new Error("Add your Google OAuth Client ID first — tap “Client ID”."));return;}
+    var tc=google.accounts.oauth2.initTokenClient({
+      client_id:cid, scope:GCAL_SCOPE,
+      callback:function(r){if(r&&r.access_token){accessToken=r.access_token;res(accessToken);}else{rej(new Error("Authorisation failed."));}},
+      error_callback:function(){rej(new Error("Authorisation was cancelled."));}
+    });
+    tc.requestAccessToken({prompt: accessToken? "":"consent"});
+  });}
+
+  function api(path,opts){opts=opts||{};
+    opts.headers=Object.assign({Authorization:"Bearer "+accessToken,"Content-Type":"application/json"},opts.headers||{});
+    return fetch("https://www.googleapis.com/calendar/v3"+path,opts).then(function(r){
+      if(!r.ok){return r.text().then(function(t){throw new Error("Google API "+r.status+": "+t.slice(0,180));});}
+      return r.status===204? null : r.json();
+    });
+  }
+
+  // Collect the postcode|date keys already present (our app tags every event).
+  function existingKeys(timeMin,timeMax){
+    var keys={}, token=null;
+    function page(){
+      var q="/calendars/primary/events?privateExtendedProperty="+encodeURIComponent("traffordBinApp=1")+
+        "&singleEvents=true&maxResults=2500&timeMin="+encodeURIComponent(timeMin)+
+        "&timeMax="+encodeURIComponent(timeMax)+(token?("&pageToken="+token):"");
+      return api(q).then(function(data){
+        (data.items||[]).forEach(function(ev){
+          var p=ev.extendedProperties&&ev.extendedProperties.private;
+          if(p&&p.traffordBinKey){keys[p.traffordBinKey]=true;}
+        });
+        if(data.nextPageToken){token=data.nextPageToken;return page();}
+        return keys;
+      });
+    }
+    return page();
+  }
+
+  function eventFor(c){
+    var names=c.bins.map(function(k){return BIN[k].name;}).join(" + ");
+    return {
+      summary:"🗑️ Bin day — "+names,
+      description:"Put out: "+names+"\nPostcode: "+current+"\nTrafford bin calendar",
+      start:{date:c.date}, end:{date:addDays(c.date,1)},
+      transparency:"transparent",
+      reminders:{useDefault:false, overrides:[{method:"popup", minutes:360}]},
+      extendedProperties:{private:{traffordBinApp:"1", traffordBinKey:current+"|"+c.date}}
+    };
+  }
+
+  function syncGCal(){
+    var btn=document.getElementById("gcal-sync");
+    var items=upcoming();
+    if(!items.length){gcalStatus("No upcoming collections to add for "+current+".");return;}
+    btn.disabled=true;
+    gcalStatus("Connecting to Google…");
+    loadGIS().then(getToken).then(function(){
+      var timeMin=parseISO(todayISO()).toISOString();
+      var timeMax=parseISO(addDays(items[items.length-1].date,2)).toISOString();
+      gcalStatus("Checking existing events…");
+      return existingKeys(timeMin,timeMax).then(function(have){
+        var toAdd=items.filter(function(c){return !have[current+"|"+c.date];});
+        if(!toAdd.length){gcalStatus("✓ Already up to date for "+current+" — "+items.length+" collections present, nothing added.");return;}
+        var added=0;
+        function next(){
+          if(added>=toAdd.length){
+            gcalStatus("✓ Added "+added+" new date"+(added===1?"":"s")+" for "+current+" ("+(items.length-added)+" already existed).");
+            return;
+          }
+          return api("/calendars/primary/events",{method:"POST",body:JSON.stringify(eventFor(toAdd[added]))}).then(function(){
+            added++;gcalStatus("Adding… "+added+"/"+toAdd.length);return next();
+          });
+        }
+        return next();
+      });
+    }).catch(function(e){gcalStatus("⚠ "+e.message);}).then(function(){btn.disabled=false;});
+  }
+
+  document.getElementById("gcal-sync").addEventListener("click",syncGCal);
+  var cfg=document.getElementById("gcal-config");
+  document.getElementById("gcal-config-btn").addEventListener("click",function(){
+    cfg.hidden=!cfg.hidden;
+    if(!cfg.hidden){document.getElementById("gcal-client-id").value=(localStorage.getItem(GCAL_STORE)||"");}
+  });
+  document.getElementById("gcal-save").addEventListener("click",function(){
+    var v=document.getElementById("gcal-client-id").value.trim();
+    if(v){localStorage.setItem(GCAL_STORE,v);}else{localStorage.removeItem(GCAL_STORE);}
+    cfg.hidden=true;gcalStatus(v?"Client ID saved. Tap “Sync to Google Calendar”.":"Client ID cleared.");
+  });
 
   refresh();
 })();</script>

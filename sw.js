@@ -1,5 +1,5 @@
 /* Service worker: offline caching */
-const CACHE = "trafford-bin-v2";
+const CACHE = "trafford-bin-v3";
 const ASSETS = [
   "./",
   "index.html",
