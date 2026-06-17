@@ -65,6 +65,11 @@ DEFAULT_POSTCODE = "M33 7TJ"
 # add your site's URL to the OAuth client's Authorized JavaScript origins.
 GOOGLE_CLIENT_ID = "193554635172-0k01k1tkem9atv96599gqjnv6tgu2eea.apps.googleusercontent.com"
 
+# Event reminder, in minutes before the all-day event's midnight start. All-day
+# events are measured from 00:00 on the collection day, so 900 minutes = 1 day
+# before at 09:00. (1440 would be exactly 24h before, i.e. midnight.)
+EVENT_REMINDER_MINUTES = 900
+
 
 def green_suspended(iso: str) -> bool:
     """Green collections are suspended 22–28 December (festive period)."""
@@ -242,6 +247,7 @@ SCRIPT = r"""
 
   // ---- Google Calendar sync ------------------------------------------------
   var GCAL_CLIENT_ID = (__GCAL_CLIENT_ID__||"").trim();
+  var REMINDER_MIN = __REMINDER_MIN__;
   var GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
   var GIS_SRC = "https://accounts.google.com/gsi/client";
   var gisLoaded = false, accessToken = null;
@@ -279,9 +285,10 @@ SCRIPT = r"""
     });
   }
 
-  // Collect the postcode|date keys already present (our app tags every event).
-  function existingKeys(timeMin,timeMax){
-    var keys={}, token=null;
+  // List events this app created (we tag every event with traffordBinApp=1).
+  // Returns [{id, key}] across the given window, following pagination.
+  function listAppEvents(timeMin,timeMax){
+    var out=[], token=null;
     function page(){
       var q="/calendars/primary/events?privateExtendedProperty="+encodeURIComponent("traffordBinApp=1")+
         "&singleEvents=true&maxResults=2500&timeMin="+encodeURIComponent(timeMin)+
@@ -289,10 +296,10 @@ SCRIPT = r"""
       return api(q).then(function(data){
         (data.items||[]).forEach(function(ev){
           var p=ev.extendedProperties&&ev.extendedProperties.private;
-          if(p&&p.traffordBinKey){keys[p.traffordBinKey]=true;}
+          out.push({id:ev.id, key:(p&&p.traffordBinKey)||""});
         });
         if(data.nextPageToken){token=data.nextPageToken;return page();}
-        return keys;
+        return out;
       });
     }
     return page();
@@ -305,7 +312,7 @@ SCRIPT = r"""
       description:"Put out: "+names+"\nPostcode: "+current+"\nTrafford bin calendar",
       start:{date:c.date}, end:{date:addDays(c.date,1)},
       transparency:"transparent",
-      reminders:{useDefault:false, overrides:[{method:"popup", minutes:360}]},
+      reminders:{useDefault:false, overrides:[{method:"popup", minutes:REMINDER_MIN}]},
       extendedProperties:{private:{traffordBinApp:"1", traffordBinKey:current+"|"+c.date}}
     };
   }
@@ -320,7 +327,8 @@ SCRIPT = r"""
       var timeMin=parseISO(todayISO()).toISOString();
       var timeMax=parseISO(addDays(items[items.length-1].date,2)).toISOString();
       gcalStatus("Checking existing events…");
-      return existingKeys(timeMin,timeMax).then(function(have){
+      return listAppEvents(timeMin,timeMax).then(function(events){
+        var have={}; events.forEach(function(e){if(e.key){have[e.key]=true;}});
         var toAdd=items.filter(function(c){return !have[current+"|"+c.date];});
         if(!toAdd.length){gcalStatus("✓ Already up to date for "+current+" — "+items.length+" collections present, nothing added.");return;}
         var added=0;
@@ -338,7 +346,34 @@ SCRIPT = r"""
     }).catch(function(e){gcalStatus("⚠ "+e.message);}).then(function(){btn.disabled=false;});
   }
 
+  // Remove every event this app added (all postcodes, past and future).
+  function removeGCal(){
+    var btn=document.getElementById("gcal-remove");
+    if(!confirm("Remove all bin collection events this app added to your Google Calendar?")){return;}
+    btn.disabled=true;
+    gcalStatus("Connecting to Google…");
+    loadGIS().then(getToken).then(function(){
+      var timeMin=new Date(Date.UTC(2025,0,1)).toISOString();
+      var timeMax=new Date(Date.UTC(2027,0,1)).toISOString();
+      gcalStatus("Finding events to remove…");
+      return listAppEvents(timeMin,timeMax).then(function(events){
+        if(!events.length){gcalStatus("No synced events found to remove.");return;}
+        var removed=0;
+        function next(){
+          if(removed>=events.length){
+            gcalStatus("✓ Removed "+removed+" synced event"+(removed===1?"":"s")+".");return;
+          }
+          return api("/calendars/primary/events/"+encodeURIComponent(events[removed].id),{method:"DELETE"}).then(function(){
+            removed++;gcalStatus("Removing… "+removed+"/"+events.length);return next();
+          });
+        }
+        return next();
+      });
+    }).catch(function(e){gcalStatus("⚠ "+e.message);}).then(function(){btn.disabled=false;});
+  }
+
   document.getElementById("gcal-sync").addEventListener("click",syncGCal);
+  document.getElementById("gcal-remove").addEventListener("click",removeGCal);
 
   refresh();
 })();
@@ -352,6 +387,7 @@ def render_html() -> str:
         .replace("__DATA__", json.dumps(build_all(), ensure_ascii=False))
         .replace("__DEFAULT__", json.dumps(DEFAULT_POSTCODE, ensure_ascii=False))
         .replace("__GCAL_CLIENT_ID__", json.dumps(GOOGLE_CLIENT_ID, ensure_ascii=False))
+        .replace("__REMINDER_MIN__", json.dumps(EVENT_REMINDER_MINUTES))
     )
     return f"""<!DOCTYPE html>
 <html lang="en-GB">
@@ -408,6 +444,7 @@ def render_html() -> str:
       <p class="gcal-status muted" id="gcal-status">Add this postcode's upcoming collections to your Google Calendar. Dates already in your calendar are skipped — re-syncing never creates duplicates.</p>
       <div class="gcal-actions">
         <button id="gcal-sync" class="btn">Sync to Google Calendar</button>
+        <button id="gcal-remove" class="btn btn-ghost">Remove synced events</button>
       </div>
     </section>
   </main>

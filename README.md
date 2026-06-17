@@ -7,7 +7,7 @@ calendar (Nov 2025 – Nov 2026) — which bins to put out, and when.
 
 - 📍 **Postcode picker** (M33 7TJ, M33 6UU) — your choice is remembered in the browser and the active postcode is highlighted
 - 📅 **Next collection** banner + full upcoming list
-- 🗓️ **Sync to Google Calendar** — adds the selected postcode's upcoming collections as all-day events (with a reminder the evening before), and **skips any date already present** so re-syncing never duplicates
+- 🗓️ **Sync to Google Calendar** — adds the selected postcode's upcoming collections as all-day events (with a reminder **1 day before**), **skips any date already present** so re-syncing never duplicates, and offers **Remove synced events** to delete everything it added
 - ♻️ **Bin legend** decoded from the council calendar
 - 📲 **Installable** to your phone's home screen and works **offline** (service worker)
 
@@ -30,7 +30,10 @@ client ID configured at build time:
 
 Events are tagged with a private marker (`postcode|date`); on each sync the app
 lists existing tagged events and only inserts the missing dates, so re-syncing
-never creates duplicates.
+never creates duplicates. **Remove synced events** deletes every event the app
+added (all postcodes). Each event carries a reminder 1 day before — change the
+time via `EVENT_REMINDER_MINUTES` in `generate.py` (minutes before midnight on
+collection day; 900 = 09:00 the previous day).
 
 > The OAuth Client ID is **not a secret** — it is embedded in the generated
 > page (as in any browser OAuth app) and visible in page source. Origin
