@@ -68,13 +68,6 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
 .empty { color:var(--muted); padding:6px 0; }
 .gcal-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
 .gcal-status { margin:0; }
-#gcal-config { margin-top:14px; padding-top:14px; border-top:1px solid var(--border);
-  display:flex; flex-direction:column; gap:8px; }
-#gcal-config label { font-size:.85rem; font-weight:600; display:flex; flex-direction:column; gap:6px; }
-#gcal-config input { padding:9px 10px; border:1px solid var(--border); border-radius:8px;
-  font-size:.9rem; width:100%; background:var(--card); color:var(--text); }
-.hint { font-size:.78rem; color:var(--muted); margin:2px 0 0; }
-.hint a { color:var(--purple); }
 .foot { text-align:center; padding:24px 16px calc(env(safe-area-inset-bottom) + 24px);
   color:var(--muted); font-size:.78rem; }
 .foot p { margin:4px 0; }
@@ -129,17 +122,6 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
       <p class="gcal-status muted" id="gcal-status">Add this postcode's upcoming collections to your Google Calendar. Dates already in your calendar are skipped — re-syncing never creates duplicates.</p>
       <div class="gcal-actions">
         <button id="gcal-sync" class="btn">Sync to Google Calendar</button>
-        <button id="gcal-config-btn" class="btn btn-ghost btn-sm">Client ID</button>
-      </div>
-      <div id="gcal-config" hidden>
-        <label for="gcal-client-id">Google OAuth Client ID
-          <input id="gcal-client-id" type="text" autocomplete="off" spellcheck="false"
-                 placeholder="1234567890-abc123.apps.googleusercontent.com" />
-        </label>
-        <div class="gcal-actions" style="margin-top:0">
-          <button id="gcal-save" class="btn btn-sm">Save</button>
-        </div>
-        <p class="hint">Create a <strong>Web application</strong> OAuth client in Google Cloud Console, enable the Google Calendar API, and add this site's URL to the client's Authorized JavaScript origins. Stored only in your browser.</p>
       </div>
     </section>
   </main>
@@ -210,14 +192,12 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
   document.addEventListener("visibilitychange",function(){if(!document.hidden)refresh();});
 
   // ---- Google Calendar sync ------------------------------------------------
-  var GCAL_CLIENT_ID_DEFAULT = "193554635172-0k01k1tkem9atv96599gqjnv6tgu2eea.apps.googleusercontent.com";
-  var GCAL_STORE = "trafford-gcal-client-id";
+  var GCAL_CLIENT_ID = ("193554635172-0k01k1tkem9atv96599gqjnv6tgu2eea.apps.googleusercontent.com"||"").trim();
   var GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
   var GIS_SRC = "https://accounts.google.com/gsi/client";
   var gisLoaded = false, accessToken = null;
 
   function gcalStatus(msg){document.getElementById("gcal-status").textContent=msg;}
-  function gcalClientId(){return ((localStorage.getItem(GCAL_STORE)||GCAL_CLIENT_ID_DEFAULT)||"").trim();}
 
   function pad(n){return (n<10?"0":"")+n;}
   function addDays(iso,n){var d=parseISO(iso);d.setDate(d.getDate()+n);
@@ -232,8 +212,8 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
   });}
 
   function getToken(){return new Promise(function(res,rej){
-    var cid=gcalClientId();
-    if(!cid){rej(new Error("Add your Google OAuth Client ID first — tap “Client ID”."));return;}
+    var cid=GCAL_CLIENT_ID;
+    if(!cid){rej(new Error("Google Calendar sync isn't configured."));return;}
     var tc=google.accounts.oauth2.initTokenClient({
       client_id:cid, scope:GCAL_SCOPE,
       callback:function(r){if(r&&r.access_token){accessToken=r.access_token;res(accessToken);}else{rej(new Error("Authorisation failed."));}},
@@ -310,16 +290,6 @@ main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-directio
   }
 
   document.getElementById("gcal-sync").addEventListener("click",syncGCal);
-  var cfg=document.getElementById("gcal-config");
-  document.getElementById("gcal-config-btn").addEventListener("click",function(){
-    cfg.hidden=!cfg.hidden;
-    if(!cfg.hidden){document.getElementById("gcal-client-id").value=(localStorage.getItem(GCAL_STORE)||"");}
-  });
-  document.getElementById("gcal-save").addEventListener("click",function(){
-    var v=document.getElementById("gcal-client-id").value.trim();
-    if(v){localStorage.setItem(GCAL_STORE,v);}else{localStorage.removeItem(GCAL_STORE);}
-    cfg.hidden=true;gcalStatus(v?"Client ID saved. Tap “Sync to Google Calendar”.":"Client ID cleared.");
-  });
 
   refresh();
 })();</script>

@@ -15,21 +15,26 @@ calendar (Nov 2025 – Nov 2026) — which bins to put out, and when.
 
 ## Google Calendar sync
 
-This runs entirely in the browser (no backend), so it needs your own Google
-OAuth **Web** client ID:
+This runs entirely in the browser (no backend), using a Google OAuth **Web**
+client ID configured at build time:
 
 1. In [Google Cloud Console](https://console.cloud.google.com/) create/select a
    project and **enable the Google Calendar API**.
 2. Under **APIs & Services → Credentials**, create an **OAuth client ID** of
    type *Web application*.
-3. Add your site's URL (e.g. your GitHub Pages URL, or `http://localhost:8000`)
-   to **Authorised JavaScript origins**.
-4. Open the app, tap **Client ID**, paste the
-   `…apps.googleusercontent.com` value, **Save**, then **Sync to Google
-   Calendar**. (You can also bake it in via `GOOGLE_CLIENT_ID` in `generate.py`.)
+3. Add your site's origin (scheme + host only, e.g. `https://you.github.io` or
+   `http://localhost:8000`) to **Authorised JavaScript origins**.
+4. Put the `…apps.googleusercontent.com` value in `GOOGLE_CLIENT_ID` in
+   `generate.py` and regenerate. The app then shows a single **Sync to Google
+   Calendar** button (the Client ID is not shown in the UI).
 
 Events are tagged with a private marker (`postcode|date`); on each sync the app
-lists existing tagged events and only inserts the missing dates.
+lists existing tagged events and only inserts the missing dates, so re-syncing
+never creates duplicates.
+
+> The OAuth Client ID is **not a secret** — it is embedded in the generated
+> page (as in any browser OAuth app) and visible in page source. Origin
+> allow-listing is what restricts its use.
 
 ## The bins
 
